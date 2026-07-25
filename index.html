@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>D30 Label Printer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left panel - controls */
+.controls {
+  min-width: 40ch;
+  flex-shrink: 0;
+  padding: 16px;
+  background: #16213e;
+  border-right: 1px solid #0f3460;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8899aa;
+}
+
+.control-group input[type="text"],
+.control-group select {
+  padding: 8px 10px;
+  background: #0f3460;
+  border: 1px solid #1a4a7a;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+.control-group input[type="text"]:focus,
+.control-group select:focus {
+  outline: none;
+  border-color: #4a9eff;
+}
+
+.icon-drop-zone {
+  border: 2px dashed #1a4a7a;
+  border-radius: 4px;
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #8899aa;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.icon-drop-zone:hover,
+.icon-drop-zone.dragover {
+  border-color: #4a9eff;
+}
+
+.icon-drop-zone img {
+  max-width: 48px;
+  max-height: 48px;
+  display: block;
+  margin: 0 auto 8px;
+}
+
+.icon-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #4a9eff;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #3a8eef;
+}
+
+.btn-primary:disabled {
+  background: #2a4a6a;
+  color: #667;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #2a3a5a;
+  color: #ccc;
+}
+
+.btn-secondary:hover {
+  background: #3a4a6a;
+}
+
+.btn-danger {
+  background: #5a2a2a;
+  color: #faa;
+}
+
+.btn-danger:hover {
+  background: #6a3a3a;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.button-row button {
+  flex: 1;
+}
+
+/* Right panel - preview */
+.preview-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #1a1a2e;
+  overflow: hidden;
+}
+
+.preview-container {
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  padding: 8px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+#labelCanvas {
+  display: block;
+  image-rendering: pixelated;
+  width: 100%;
+  height: auto;
+}
+
+/* Bottom status bar */
+.status-bar {
+  padding: 8px 16px;
+  background: #0f3460;
+  border-top: 1px solid #1a4a7a;
+  font-size: 12px;
+  color: #8899aa;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.status-indicator.connected {
+  background: #4caf50;
+}
+
+.status-indicator.connecting {
+  background: #ff9800;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Hidden file inputs */
+.hidden { display: none; }
+
+/* Troubleshooting dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.dialog-overlay.hidden { display: none; }
+
+.dialog {
+  background: #16213e;
+  border: 1px solid #1a4a7a;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.dialog h2 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #4a9eff;
+}
+
+.dialog ol {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dialog code {
+  background: #0f3460;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.dialog .dialog-close {
+  margin-top: 16px;
+  width: 100%;
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Left panel: controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label>Label Size</label>
+      <select id="labelSize">
+        <option value="12x22">12 x 22 mm</option>
+        <option value="12x30">12 x 30 mm</option>
+        <option value="12x40" selected>12 x 40 mm</option>
+        <option value="14x22">14 x 22 mm</option>
+        <option value="14x30">14 x 30 mm</option>
+        <option value="14x40">14 x 40 mm</option>
+        <option value="14x50">14 x 50 mm</option>
+        <option value="15x30">15 x 30 mm</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Icon</label>
+      <div class="icon-drop-zone" id="iconDropZone">
+        <span id="iconPlaceholder">Drop image or click to upload</span>
+      </div>
+      <div class="icon-actions">
+        <button class="btn-secondary" id="iconUploadBtn">Browse</button>
+        <button class="btn-danger" id="iconClearBtn">Clear</button>
+      </div>
+      <input type="file" id="iconFileInput" class="hidden" accept="image/*">
+    </div>
+
+    <div class="control-group">
+      <label>Top Text</label>
+      <input type="text" id="topText" placeholder="Optional">
+    </div>
+
+    <div class="control-group">
+      <label>Bottom Text</label>
+      <input type="text" id="bottomText" placeholder="Optional">
+    </div>
+
+    <div class="control-group">
+      <label>Font</label>
+      <select id="fontSelect">
+        <option value="system-ui">System UI</option>
+        <option value="serif">Serif</option>
+        <option value="sans-serif">Sans-serif</option>
+        <option value="monospace">Monospace</option>
+        <option value="cursive">Cursive</option>
+      </select>
+      <button class="btn-secondary" id="fontUploadBtn">Upload .ttf</button>
+      <input type="file" id="fontFileInput" class="hidden" accept=".ttf,.otf,.woff,.woff2">
+    </div>
+
+    <div class="control-group">
+      <label>Font Size</label>
+      <select id="fontSize">
+        <option value="12">12px</option>
+        <option value="16">16px</option>
+        <option value="20">20px</option>
+        <option value="24" selected>24px</option>
+        <option value="28">28px</option>
+        <option value="32">32px</option>
+        <option value="36">36px</option>
+        <option value="40">40px</option>
+      </select>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-secondary" id="saveTemplateBtn">Save</button>
+      <button class="btn-secondary" id="loadTemplateBtn">Load</button>
+    </div>
+
+    <div class="button-row">
+      <button class="btn-secondary" id="connectBtn">Connect</button>
+      <button class="btn-primary" id="printBtn" disabled>Print</button>
+    </div>
+  </div>
+
+  <!-- Right panel: preview -->
+  <div class="preview-panel">
+    <div class="preview-container">
+      <canvas id="labelCanvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <div class="status-indicator" id="statusIndicator"></div>
+  <span id="statusText">Disconnected</span>
+</div>
+
+<!-- Troubleshooting dialog -->
+<div class="dialog-overlay hidden" id="troubleDialog">
+  <div class="dialog">
+    <h2>Connection Troubleshooting</h2>
+    <p style="margin-bottom: 12px; font-size: 13px;">If the printer won't connect, try these steps in order:</p>
+    <ol>
+      <li><strong>Wake the printer</strong> - Press the D30's button. It sleeps after a few seconds of inactivity.</li>
+      <li><strong>Disconnect at OS level</strong> - If your system has an active BLE connection, the web app can't connect.
+        <br><code>bluetoothctl disconnect &lt;ADDRESS&gt;</code></li>
+      <li><strong>Remove and re-pair</strong> - Stale pairing data can block connections.
+        <br><code>bluetoothctl remove &lt;ADDRESS&gt;</code>
+        <br>Then try connecting from the web app again.</li>
+      <li><strong>Restart Bluetooth service</strong>
+        <br><code>sudo systemctl restart bluetooth</code></li>
+      <li><strong>Check permissions</strong> - Your user needs to be in the bluetooth group.
+        <br><code>sudo usermod -aG bluetooth $USER</code>
+        <br>Log out and back in after.</li>
+      <li><strong>Verify Chromium flags</strong> - Open <code>chrome://flags/#enable-web-bluetooth</code> and ensure it is enabled.</li>
+    </ol>
+    <button class="btn-secondary dialog-close" id="troubleCloseBtn">Close</button>
+  </div>
+</div>
+
+<!-- Save template dialog -->
+<div class="dialog-overlay hidden" id="saveDialog">
+  <div class="dialog">
+    <h2>Save Template</h2>
+    <div class="control-group" style="margin-bottom: 12px;">
+      <label>Template Name</label>
+      <input type="text" id="templateNameInput" placeholder="My label template">
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn-primary" id="saveConfirmBtn" style="flex:1;">Save</button>
+      <button class="btn-secondary" id="saveCancelBtn" style="flex:1;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load template dialog -->
+<div class="dialog-overlay hidden" id="loadDialog">
+  <div class="dialog">
+    <h2>Load Template</h2>
+    <div id="templateList" style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+    <button class="btn-secondary dialog-close" id="loadCancelBtn">Close</button>
+  </div>
+</div>
+
+<script>
+
+// --- Constants ---
+const DPI = 203;
+const MM_PER_INCH = 25.4;
+const BLE_WRITE_CHAR = '0000ff02-0000-1000-8000-00805f9b34fb';
+const BLE_SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb';
+const BLE_CHUNK_SIZE = 20;
+const PREVIEW_SCALE = 3;
+
+// --- State ---
+let state = {
+  iconImage: null,
+  bleDevice: null,
+  bleCharacteristic: null,
+  connected: false,
+  customFontName: null,
+  customFontDataUrl: null,
+  customFontFileName: null
+};
+
+// --- DOM refs ---
+const canvas = document.getElementById('labelCanvas');
+const ctx = canvas.getContext('2d');
+const labelSizeSelect = document.getElementById('labelSize');
+const topTextInput = document.getElementById('topText');
+const bottomTextInput = document.getElementById('bottomText');
+const fontSelect = document.getElementById('fontSelect');
+const fontSizeSelect = document.getElementById('fontSize');
+const iconDropZone = document.getElementById('iconDropZone');
+const iconPlaceholder = document.getElementById('iconPlaceholder');
+const iconFileInput = document.getElementById('iconFileInput');
+const iconUploadBtn = document.getElementById('iconUploadBtn');
+const iconClearBtn = document.getElementById('iconClearBtn');
+const fontUploadBtn = document.getElementById('fontUploadBtn');
+const fontFileInput = document.getElementById('fontFileInput');
+const connectBtn = document.getElementById('connectBtn');
+const printBtn = document.getElementById('printBtn');
+const statusIndicator = document.getElementById('statusIndicator');
+const statusText = document.getElementById('statusText');
+const troubleDialog = document.getElementById('troubleDialog');
+const troubleCloseBtn = document.getElementById('troubleCloseBtn');
+
+function showTroubleDialog() {
+  troubleDialog.classList.remove('hidden');
+}
+
+function hideTroubleDialog() {
+  troubleDialog.classList.add('hidden');
+}
+
+troubleCloseBtn.addEventListener('click', hideTroubleDialog);
+troubleDialog.addEventListener('click', (e) => {
+  if (e.target === troubleDialog) hideTroubleDialog();
+});
+
+// --- Label size helpers ---
+function parseLabelSize(value) {
+  const [w, h] = value.split('x').map(Number);
+  return { widthMm: w, heightMm: h };
+}
+
+function mmToDots(mm) {
+  return Math.round((mm / MM_PER_INCH) * DPI);
+}
+
+function getLabelDots() {
+  const { widthMm, heightMm } = parseLabelSize(labelSizeSelect.value);
+  return { width: mmToDots(widthMm), height: mmToDots(heightMm) };
+}
+
+// --- Canvas rendering ---
+function renderPreview() {
+  const { width, height } = getLabelDots();
+  canvas.width = height; // landscape: length is horizontal
+  canvas.height = width; // width (tape width) is vertical
+  const container = canvas.parentElement;
+  container.style.width = (height * PREVIEW_SCALE) + 'px';
+  container.style.maxWidth = '100%';
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const topText = topTextInput.value.trim();
+  const bottomText = bottomTextInput.value.trim();
+  const hasIcon = state.iconImage !== null;
+  const hasTop = topText.length > 0;
+  const hasBottom = bottomText.length > 0;
+  const fontSize = parseInt(fontSizeSelect.value);
+  const fontFamily = state.customFontName || fontSelect.value;
+
+  ctx.fillStyle = '#000000';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${fontSize}px ${fontFamily}`;
+
+  const padding = 4;
+  const iconSize = Math.min(canvas.height - padding * 2, canvas.height * 0.6);
+
+  if (!hasIcon && !hasTop && !hasBottom) {
+    // Nothing to render
+    return;
+  }
+
+  // Determine layout zones
+  let textX = padding;
+  let textWidth = canvas.width - padding * 2;
+
+  // Draw icon if present
+  if (hasIcon) {
+    const iconY = (canvas.height - iconSize) / 2;
+    ctx.drawImage(state.iconImage, padding, iconY, iconSize, iconSize);
+    textX = padding + iconSize + padding;
+    textWidth = canvas.width - textX - padding;
+  }
+
+  // Draw text
+  if (hasTop && hasBottom) {
+    // Two rows: split vertically
+    const rowHeight = canvas.height / 2;
+    drawTextCentered(topText, textX, textWidth, 0, rowHeight, fontSize, fontFamily);
+    drawTextCentered(bottomText, textX, textWidth, rowHeight, rowHeight, fontSize, fontFamily);
+  } else if (hasTop) {
+    drawTextCentered(topText, textX, textWidth, 0, canvas.height, fontSize, fontFamily);
+  } else if (hasBottom) {
+    drawTextCentered(bottomText, textX, textWidth, 0, canvas.height, fontSize, fontFamily);
+  }
+}
+
+function drawTextCentered(text, areaX, areaWidth, areaY, areaHeight, fontSize, fontFamily) {
+  ctx.font = `${fontSize}px ${fontFamily}`;
+  ctx.textBaseline = 'middle';
+  const measured = ctx.measureText(text);
+  const x = areaX + (areaWidth - measured.width) / 2;
+  const y = areaY + areaHeight / 2;
+  ctx.fillText(text, x, y);
+}
+
+// --- Icon handling ---
+function loadIcon(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      state.iconImage = img;
+      iconPlaceholder.textContent = file.name;
+      const preview = iconDropZone.querySelector('img');
+      if (preview) preview.remove();
+      const previewImg = document.createElement('img');
+      previewImg.src = e.target.result;
+      iconDropZone.prepend(previewImg);
+      renderPreview();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearIcon() {
+  state.iconImage = null;
+  iconPlaceholder.textContent = 'Drop image or click to upload';
+  const preview = iconDropZone.querySelector('img');
+  if (preview) preview.remove();
+  renderPreview();
+}
+
+iconUploadBtn.addEventListener('click', () => iconFileInput.click());
+iconDropZone.addEventListener('click', () => iconFileInput.click());
+iconClearBtn.addEventListener('click', clearIcon);
+iconFileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) loadIcon(e.target.files[0]);
+});
+
+iconDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  iconDropZone.classList.add('dragover');
+});
+iconDropZone.addEventListener('dragleave', () => {
+  iconDropZone.classList.remove('dragover');
+});
+iconDropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  iconDropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) loadIcon(e.dataTransfer.files[0]);
+});
+
+// --- Font handling ---
+fontUploadBtn.addEventListener('click', () => fontFileInput.click());
+fontFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buffer = await file.arrayBuffer();
+  const fontName = 'CustomUpload';
+  const face = new FontFace(fontName, buffer);
+  await face.load();
+  document.fonts.add(face);
+  state.customFontName = fontName;
+
+  // Store font as data URL for template saving
+  const blob = new Blob([buffer]);
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.customFontDataUrl = reader.result;
+    state.customFontFileName = file.name;
+  };
+  reader.readAsDataURL(blob);
+
+  // Add to dropdown if not already there
+  let option = fontSelect.querySelector(`option[value="${fontName}"]`);
+  if (!option) {
+    option = document.createElement('option');
+    option.value = fontName;
+    option.textContent = file.name;
+    fontSelect.appendChild(option);
+  }
+  fontSelect.value = fontName;
+  renderPreview();
+  setStatus('Font loaded: ' + file.name);
+});
+
+fontSelect.addEventListener('change', () => {
+  if (fontSelect.value !== state.customFontName) {
+    state.customFontName = null;
+  }
+  renderPreview();
+});
+
+// --- Live preview on input changes ---
+labelSizeSelect.addEventListener('change', renderPreview);
+topTextInput.addEventListener('input', renderPreview);
+bottomTextInput.addEventListener('input', renderPreview);
+fontSizeSelect.addEventListener('change', renderPreview);
+
+// --- BLE connection ---
+async function bleConnect() {
+  if (!navigator.bluetooth) {
+    setStatus('Web Bluetooth not supported in this browser');
+    return;
+  }
+
+  try {
+    setStatus('Scanning...', 'connecting');
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [BLE_SERVICE_UUID]
+    });
+
+    state.bleDevice = device;
+    device.addEventListener('gattserverdisconnected', onDisconnect);
+
+    setStatus('Connecting...', 'connecting');
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+    state.bleCharacteristic = await service.getCharacteristic(BLE_WRITE_CHAR);
+    state.connected = true;
+
+    setStatus('Connected to ' + device.name, 'connected');
+    connectBtn.textContent = 'Disconnect';
+    printBtn.disabled = false;
+  } catch (err) {
+    if (err.name !== 'NotFoundError') {
+      // NotFoundError means user cancelled the picker - don't show dialog for that
+      setStatus('Connection failed: ' + err.message);
+      showTroubleDialog();
+    } else {
+      setStatus('Cancelled');
+    }
+    state.connected = false;
+  }
+}
+
+function bleDisconnect() {
+  if (state.bleDevice && state.bleDevice.gatt.connected) {
+    state.bleDevice.gatt.disconnect();
+  }
+  onDisconnect();
+}
+
+function onDisconnect() {
+  state.connected = false;
+  state.bleCharacteristic = null;
+  connectBtn.textContent = 'Connect';
+  printBtn.disabled = true;
+  setStatus('Disconnected');
+}
+
+connectBtn.addEventListener('click', () => {
+  if (state.connected) {
+    bleDisconnect();
+  } else {
+    bleConnect();
+  }
+});
+
+// --- Raster conversion and printing ---
+function canvasToRaster() {
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+  const width = canvas.width;
+  const height = canvas.height;
+  const data = [];
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x += 8) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        if (x + bit < width) {
+          const idx = ((y * width) + (x + bit)) * 4;
+          // Grayscale threshold: dark pixel = black dot = bit set
+          const gray = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+          if (gray < 128) {
+            byte |= (1 << (7 - bit));
+          }
+        }
+      }
+      data.push(byte);
+    }
+  }
+
+  return new Uint8Array(data);
+}
+
+function buildPrintPayload() {
+  // The D30 printhead is always 96 dots (12 bytes) wide regardless of tape size.
+  // Label length (feed direction) comes from the selected size.
+  const PRINTHEAD_WIDTH = 96;
+  const { height } = getLabelDots();
+  const printWidth = PRINTHEAD_WIDTH;
+  const printHeight = height; // label length = feed direction
+
+  // Rotate canvas data 90 CW: canvas is landscape (length x tapeWidth),
+  // printer expects portrait (printheadWidth x length)
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = canvas.width;
+  srcCanvas.height = canvas.height;
+  const srcCtx = srcCanvas.getContext('2d');
+  srcCtx.drawImage(canvas, 0, 0);
+
+  const rotCanvas = document.createElement('canvas');
+  rotCanvas.width = printWidth;
+  rotCanvas.height = printHeight;
+  const rotCtx = rotCanvas.getContext('2d');
+  rotCtx.translate(printWidth, 0);
+  rotCtx.rotate(Math.PI / 2);
+  // Scale source to fit rotated dimensions (source height -> printWidth, source width -> printHeight)
+  rotCtx.drawImage(srcCanvas, 0, 0, srcCanvas.width, srcCanvas.height, 0, 0, printHeight, printWidth);
+
+  // Get rotated raster
+  const rotImageData = rotCtx.getImageData(0, 0, printWidth, printHeight);
+  const pixels = rotImageData.data;
+  const raster = [];
+
+  for (let y = 0; y < printHeight; y++) {
+    for (let x = 0; x < printWidth; x += 8) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        if (x + bit < printWidth) {
+          const idx = ((y * printWidth) + (x + bit)) * 4;
+          const gray = (pixels[idx] + pixels[idx + 1] + pixels[idx + 2]) / 3;
+          if (gray < 128) {
+            byte |= (1 << (7 - bit));
+          }
+        }
+      }
+      raster.push(byte);
+    }
+  }
+
+  const widthBytes = printWidth / 8; // always 12
+  const commands = [];
+
+  // Preamble
+  commands.push(0x1f, 0x11, 0x24, 0x00);
+  // Initialize
+  commands.push(0x1b, 0x40);
+  // GS v 0 - raster bit image
+  commands.push(0x1d, 0x76, 0x30, 0x00);
+  // Width in bytes (little-endian 16-bit)
+  commands.push(widthBytes & 0xff, (widthBytes >> 8) & 0xff);
+  // Height in dots (little-endian 16-bit)
+  commands.push(printHeight & 0xff, (printHeight >> 8) & 0xff);
+  // Raster data
+  commands.push(...raster);
+
+  return new Uint8Array(commands);
+}
+
+async function printLabel() {
+  if (!state.connected || !state.bleCharacteristic) {
+    setStatus('Not connected');
+    return;
+  }
+
+  try {
+    printBtn.disabled = true;
+    setStatus('Preparing print data...', 'connected');
+    const payload = buildPrintPayload();
+    const totalChunks = Math.ceil(payload.length / BLE_CHUNK_SIZE);
+
+    setStatus(`Sending ${payload.length} bytes...`, 'connected');
+    for (let i = 0; i < payload.length; i += BLE_CHUNK_SIZE) {
+      const chunk = payload.slice(i, i + BLE_CHUNK_SIZE);
+      await state.bleCharacteristic.writeValue(chunk);
+      const progress = Math.round(((i + chunk.length) / payload.length) * 100);
+      setStatus(`Printing... ${progress}%`, 'connected');
+    }
+
+    setStatus('Print complete', 'connected');
+  } catch (err) {
+    setStatus('Print failed: ' + err.message, 'connected');
+  } finally {
+    printBtn.disabled = false;
+  }
+}
+
+printBtn.addEventListener('click', printLabel);
+
+// --- Status bar ---
+function setStatus(text, connectionState) {
+  statusText.textContent = text;
+  statusIndicator.className = 'status-indicator';
+  if (connectionState === 'connected') {
+    statusIndicator.classList.add('connected');
+  } else if (connectionState === 'connecting') {
+    statusIndicator.classList.add('connecting');
+  }
+}
+
+// --- Template save/load ---
+const TEMPLATES_KEY = 'd30_templates';
+const ICON_MAX_SIZE = 96;
+
+const saveTemplateBtn = document.getElementById('saveTemplateBtn');
+const loadTemplateBtn = document.getElementById('loadTemplateBtn');
+const saveDialog = document.getElementById('saveDialog');
+const loadDialog = document.getElementById('loadDialog');
+const templateNameInput = document.getElementById('templateNameInput');
+const saveConfirmBtn = document.getElementById('saveConfirmBtn');
+const saveCancelBtn = document.getElementById('saveCancelBtn');
+const loadCancelBtn = document.getElementById('loadCancelBtn');
+const templateList = document.getElementById('templateList');
+
+function getTemplates() {
+  const raw = localStorage.getItem(TEMPLATES_KEY);
+  return raw ? JSON.parse(raw) : {};
+}
+
+function saveTemplates(templates) {
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+}
+
+function downscaleIcon(img) {
+  // Downscale icon to max ICON_MAX_SIZE x ICON_MAX_SIZE and return as data URL
+  const size = ICON_MAX_SIZE;
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = size;
+  tmpCanvas.height = size;
+  const tmpCtx = tmpCanvas.getContext('2d');
+  // Fit within square, maintain aspect ratio
+  const scale = Math.min(size / img.width, size / img.height);
+  const w = img.width * scale;
+  const h = img.height * scale;
+  tmpCtx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+  return tmpCanvas.toDataURL('image/png');
+}
+
+function buildTemplateData(name) {
+  const template = {
+    name: name,
+    labelSize: labelSizeSelect.value,
+    topText: topTextInput.value,
+    bottomText: bottomTextInput.value,
+    font: fontSelect.value,
+    fontSize: fontSizeSelect.value,
+    iconDataUrl: state.iconImage ? downscaleIcon(state.iconImage) : null,
+    customFontDataUrl: state.customFontDataUrl || null,
+    customFontFileName: state.customFontFileName || null
+  };
+  return template;
+}
+
+function applyTemplate(template) {
+  labelSizeSelect.value = template.labelSize || '12x40';
+  topTextInput.value = template.topText || '';
+  bottomTextInput.value = template.bottomText || '';
+  fontSizeSelect.value = template.fontSize || '24';
+
+  // Restore custom font if present
+  if (template.customFontDataUrl && template.customFontFileName) {
+    fetch(template.customFontDataUrl)
+      .then(r => r.arrayBuffer())
+      .then(buffer => {
+        const fontName = 'CustomUpload';
+        const face = new FontFace(fontName, buffer);
+        return face.load().then(() => {
+          document.fonts.add(face);
+          state.customFontName = fontName;
+          state.customFontDataUrl = template.customFontDataUrl;
+          state.customFontFileName = template.customFontFileName;
+          let option = fontSelect.querySelector(`option[value="${fontName}"]`);
+          if (!option) {
+            option = document.createElement('option');
+            option.value = fontName;
+            option.textContent = template.customFontFileName;
+            fontSelect.appendChild(option);
+          }
+          fontSelect.value = fontName;
+          renderPreview();
+        });
+      });
+  } else {
+    fontSelect.value = template.font || 'system-ui';
+    state.customFontName = null;
+  }
+
+  // Restore icon if present
+  if (template.iconDataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      state.iconImage = img;
+      iconPlaceholder.textContent = 'Template icon';
+      const preview = iconDropZone.querySelector('img');
+      if (preview) preview.remove();
+      const previewImg = document.createElement('img');
+      previewImg.src = template.iconDataUrl;
+      iconDropZone.prepend(previewImg);
+      renderPreview();
+    };
+    img.src = template.iconDataUrl;
+  } else {
+    clearIcon();
+  }
+
+  renderPreview();
+}
+
+saveTemplateBtn.addEventListener('click', () => {
+  templateNameInput.value = '';
+  saveDialog.classList.remove('hidden');
+  templateNameInput.focus();
+});
+
+saveCancelBtn.addEventListener('click', () => {
+  saveDialog.classList.add('hidden');
+});
+
+saveDialog.addEventListener('click', (e) => {
+  if (e.target === saveDialog) saveDialog.classList.add('hidden');
+});
+
+saveConfirmBtn.addEventListener('click', () => {
+  const name = templateNameInput.value.trim();
+  if (!name) return;
+  const templates = getTemplates();
+  templates[name] = buildTemplateData(name);
+  saveTemplates(templates);
+  saveDialog.classList.add('hidden');
+  setStatus('Template saved: ' + name);
+});
+
+templateNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') saveConfirmBtn.click();
+});
+
+loadTemplateBtn.addEventListener('click', () => {
+  const templates = getTemplates();
+  templateList.innerHTML = '';
+  const names = Object.keys(templates);
+  if (names.length === 0) {
+    templateList.innerHTML = '<p style="font-size:13px; color:#8899aa;">No saved templates.</p>';
+  } else {
+    names.forEach(name => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:8px; align-items:center;';
+      const loadBtn = document.createElement('button');
+      loadBtn.className = 'btn-primary';
+      loadBtn.textContent = name;
+      loadBtn.style.flex = '1';
+      loadBtn.addEventListener('click', () => {
+        applyTemplate(templates[name]);
+        loadDialog.classList.add('hidden');
+        setStatus('Loaded template: ' + name);
+      });
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-danger';
+      delBtn.textContent = 'Del';
+      delBtn.addEventListener('click', () => {
+        delete templates[name];
+        saveTemplates(templates);
+        row.remove();
+        if (Object.keys(templates).length === 0) {
+          templateList.innerHTML = '<p style="font-size:13px; color:#8899aa;">No saved templates.</p>';
+        }
+        setStatus('Deleted template: ' + name);
+      });
+      row.appendChild(loadBtn);
+      row.appendChild(delBtn);
+      templateList.appendChild(row);
+    });
+  }
+  loadDialog.classList.remove('hidden');
+});
+
+loadCancelBtn.addEventListener('click', () => {
+  loadDialog.classList.add('hidden');
+});
+
+loadDialog.addEventListener('click', (e) => {
+  if (e.target === loadDialog) loadDialog.classList.add('hidden');
+});
+
+// --- Init ---
+renderPreview();
+</script>
+</body>
+</html>
